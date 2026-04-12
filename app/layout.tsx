@@ -20,6 +20,11 @@ export const metadata = {
   },
   description:
     "Self-hostable Paystack-compatible payment simulator for African developers",
+  icons: {
+    icon: "/logo.JPG",
+    shortcut: "/logo.JPG",
+    apple: "/logo.JPG",
+  },
   metadataBase: new URL("https://docs.payfake.co"),
   openGraph: {
     title: "Payfake Documentation",

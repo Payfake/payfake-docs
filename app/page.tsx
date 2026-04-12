@@ -1,4 +1,3 @@
-// app/page.tsx
 "use client";
 
 import { motion } from "framer-motion";
@@ -19,7 +18,6 @@ import Image from "next/image";
 export default function DocsHomepage() {
   return (
     <div className="min-h-screen bg-black">
-      {/* Hero */}
       <section className="px-6 py-16 md:py-24">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -70,7 +68,6 @@ export default function DocsHomepage() {
         </motion.div>
       </section>
 
-      {/* Quick Links Grid */}
       <section className="px-6 py-16 border-t border-white/10">
         <div className="max-w-6xl mx-auto">
           <motion.h2
@@ -132,7 +129,6 @@ export default function DocsHomepage() {
         </div>
       </section>
 
-      {/* API Endpoints Quick Reference */}
       <section className="px-6 py-16 border-t border-white/10">
         <div className="max-w-6xl mx-auto">
           <motion.h2
@@ -206,7 +202,6 @@ export default function DocsHomepage() {
         </div>
       </section>
 
-      {/* Features */}
       <section className="px-6 py-16 border-t border-white/10">
         <div className="max-w-6xl mx-auto">
           <motion.h2
@@ -273,7 +268,6 @@ export default function DocsHomepage() {
         </div>
       </section>
 
-      {/* Footer CTA */}
       <section className="px-6 py-16 border-t border-white/10">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div
