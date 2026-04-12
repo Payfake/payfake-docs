@@ -1,0 +1,72 @@
+---
+title: Installation
+description: Detailed installation instructions for Payfake
+---
+
+# Installation
+
+## System Requirements
+
+| Requirement | Minimum Version |
+|-------------|-----------------|
+| Go | 1.21+ |
+| PostgreSQL | 14+ |
+| Docker (optional) | 20.10+ |
+
+## Docker Installation
+
+The recommended way to run Payfake is with Docker.
+
+```bash
+git clone https://github.com/payfake/payfake-api
+cd payfake-api
+docker-compose up --build
+```
+
+This starts:
+- Payfake API on `http://localhost:8080`
+- PostgreSQL on `localhost:5432`
+
+## Manual Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/payfake/payfake-api
+cd payfake-api
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your database credentials:
+
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=payfake
+JWT_SECRET=your-secret-key-change-this
+```
+
+### 3. Run Migrations
+
+```bash
+go run cmd/migrate/main.go up
+```
+
+### 4. Start the Server
+
+```bash
+go run cmd/api/main.go
+```
+
+## Verify Installation
+
+```bash
+curl http://localhost:8080/health
+```

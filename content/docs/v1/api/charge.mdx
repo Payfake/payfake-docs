@@ -1,0 +1,68 @@
+---
+title: Charge API
+description: Process card, mobile money, and bank payments
+---
+
+# Charge API
+
+Process payments through various channels.
+
+<Endpoint method="POST" path="/api/v1/charge/card" />
+
+### Charge Card
+
+Processes a card payment.
+
+**Request Body:**
+
+```json
+{
+  "access_code": "ACC_A1B2C3D4E5F6",
+  "card_number": "4111111111111111",
+  "card_expiry": "12/26",
+  "cvv": "123",
+  "email": "customer@example.com"
+}
+```
+
+**Response (Success):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "transaction": {
+      "reference": "unique-ref-001",
+      "status": "success",
+      "amount": 10000
+    }
+  }
+}
+```
+
+<Endpoint method="POST" path="/api/v1/charge/mobile_money" />
+
+### Charge Mobile Money
+
+Processes a mobile money payment.
+
+**Request Body:**
+
+```json
+{
+  "access_code": "ACC_A1B2C3D4E5F6",
+  "phone": "+233241234567",
+  "provider": "mtn",
+  "email": "customer@example.com"
+}
+```
+
+| Provider | Value |
+|----------|-------|
+| MTN Mobile Money | `mtn` |
+| Vodafone Cash | `vodafone` |
+| AirtelTigo Money | `airteltigo` |
+
+<Callout type="warning" title="Async Processing">
+  Mobile money charges always return `status: "pending"` immediately. The final outcome arrives via webhook. Always implement a webhook handler.
+</Callout>

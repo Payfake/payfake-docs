@@ -1,0 +1,269 @@
+---
+title: Rust SDK
+description: Payfake Rust SDK documentation
+---
+
+# Rust SDK
+
+The official Payfake SDK for Rust.
+
+## Installation
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+payfake = "0.1"
+tokio = { version = "1", features = ["full"] }
+```
+
+## Quick Start
+
+```rust
+use payfake::{Client, Config, InitializeInput};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::new(Config {
+        secret_key: "sk_test_xxx".to_string(),
+        base_url: Some("http://localhost:8080".to_string()),
+        timeout_secs: None,
+    });
+
+    let tx = client.transaction.initialize(InitializeInput {
+        email: "customer@example.com".to_string(),
+        amount: 10000,
+        currency: Some("GHS".to_string()),
+        ..Default::default()
+    }).await?;
+
+    println!("Authorization URL: {}", tx.authorization_url);
+    println!("Access Code: {}", tx.access_code);
+    println!("Reference: {}", tx.reference);
+
+    Ok(())
+}
+```
+
+## Authentication
+
+```rust
+use payfake::{Client, Config, RegisterInput, LoginInput};
+use payfake::errors::codes;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create auth client with empty secret key
+    let auth_client = Client::new(Config {
+        secret_key: "".to_string(),
+        base_url: Some("http://localhost:8080".to_string()),
+        timeout_secs: None,
+    });
+
+    // Register or login
+    let token = match auth_client.auth.register(RegisterInput {
+        business_name: "Acme Store".to_string(),
+        email: "dev@acme.com".to_string(),
+        password: "secret123".to_string(),
+    }).await {
+        Ok(resp) => {
+            println!("Registered: {}", resp.merchant.id);
+            resp.token
+        }
+        Err(e) if e.is_code(codes::EMAIL_TAKEN) => {
+            let resp = auth_client.auth.login(LoginInput {
+                email: "dev@acme.com".to_string(),
+                password: "secret123".to_string(),
+            }).await?;
+            println!("Logged in as: {}", resp.merchant.email);
+            resp.token
+        }
+        Err(e) => return Err(e.into()),
+    };
+
+    // Get API keys
+    let keys = auth_client.auth.get_keys(&token).await?;
+    println!("Public Key: {}", keys.public_key);
+    println!("Secret Key: {}", keys.secret_key);
+
+    // Create authenticated client
+    let client = Client::new(Config {
+        secret_key: keys.secret_key,
+        base_url: Some("http://localhost:8080".to_string()),
+        timeout_secs: None,
+    });
+
+    Ok(())
+}
+```
+
+## Initialize Transaction
+
+```rust
+use payfake::{InitializeInput};
+use std::collections::HashMap;
+
+let mut metadata = HashMap::new();
+metadata.insert("order_id".to_string(), "12345".to_string());
+
+let tx = client.transaction.initialize(InitializeInput {
+    email: "customer@example.com".to_string(),
+    amount: 10000,
+    currency: Some("GHS".to_string()),
+    reference: Some("unique-ref-001".to_string()),
+    callback_url: Some("https://yourapp.com/callback".to_string()),
+    channels: Some(vec!["card".to_string(), "mobile_money".to_string()]),
+    metadata: Some(metadata),
+    ..Default::default()
+}).await?;
+```
+
+## Charge Card
+
+```rust
+use payfake::{ChargeCardInput};
+use payfake::errors::codes;
+
+match client.charge.card(ChargeCardInput {
+    access_code: Some(tx.access_code.clone()),
+    card_number: "4111111111111111".to_string(),
+    card_expiry: "12/26".to_string(),
+    cvv: "123".to_string(),
+    email: "customer@example.com".to_string(),
+    ..Default::default()
+}).await {
+    Ok(charge) => {
+        println!("Status: {}", charge.transaction.status);
+    }
+    Err(e) if e.is_code(codes::CHARGE_FAILED) => {
+        println!("Charge failed");
+        if let Some(field) = e.fields().first() {
+            println!("Reason: {}", field.message);
+        }
+    }
+    Err(e) => return Err(e.into()),
+}
+```
+
+## Charge Mobile Money
+
+```rust
+use payfake::{ChargeMomoInput};
+
+let momo = client.charge.mobile_money(ChargeMomoInput {
+    access_code: Some(tx.access_code),
+    phone: "+233241234567".to_string(),
+    provider: "mtn".to_string(),
+    email: "customer@example.com".to_string(),
+    ..Default::default()
+}).await?;
+
+// MoMo always returns pending immediately
+println!("Status: {}", momo.transaction.status); // "pending"
+```
+
+## Verify Transaction
+
+```rust
+let verified = client.transaction.verify(&tx.reference).await?;
+
+if verified.status == "success" {
+    println!("Payment successful");
+}
+```
+
+## Control Panel
+
+```rust
+use payfake::{UpdateScenarioInput, ForceTransactionInput, ListOptions};
+
+// Update scenario
+let scenario = auth_client.control.update_scenario(&token, UpdateScenarioInput {
+    failure_rate: Some(0.5),
+    delay_ms: Some(2000),
+    ..Default::default()
+}).await?;
+
+println!("Failure rate: {}", scenario.failure_rate);
+
+// Force transaction outcome
+let forced = auth_client.control.force_transaction(
+    &token,
+    &tx.reference,
+    ForceTransactionInput {
+        status: "failed".to_string(),
+        error_code: Some("CHARGE_INSUFFICIENT_FUNDS".to_string()),
+    },
+).await?;
+
+println!("Forced status: {}", forced.status);
+
+// Reset scenario
+auth_client.control.reset_scenario(&token).await?;
+
+// Get logs
+match auth_client.control.get_logs(&token, ListOptions {
+    page: 1,
+    per_page: 5,
+}).await {
+    Ok(logs) => {
+        println!("Recent requests: {}", logs.len());
+        for log in &logs {
+            println!("  {} {} -> {}", log.method, log.path, log.status_code);
+        }
+    }
+    Err(e) if e.is_code("LOGS_EMPTY") => {
+        println!("No logs found yet");
+    }
+    Err(e) => return Err(e.into()),
+}
+```
+
+## Error Handling
+
+```rust
+use payfake::errors::codes;
+
+match client.charge.card(input).await {
+    Ok(charge) => println!("Success: {}", charge.transaction.status),
+    Err(e) => {
+        if e.is_code(codes::CHARGE_FAILED) {
+            println!("Charge failed");
+        } else if e.is_code(codes::INVALID_CARD) {
+            println!("Invalid card number");
+        } else if e.is_code(codes::CARD_EXPIRED) {
+            println!("Card has expired");
+        } else {
+            eprintln!("Error: {}", e);
+        }
+    }
+}
+```
+
+## Available Error Codes
+
+```rust
+use payfake::errors::codes;
+
+codes::EMAIL_TAKEN           // AUTH_EMAIL_TAKEN
+codes::INVALID_CREDENTIALS   // AUTH_INVALID_CREDENTIALS
+codes::UNAUTHORIZED          // AUTH_UNAUTHORIZED
+codes::CHARGE_FAILED         // CHARGE_FAILED
+codes::INVALID_CARD          // CHARGE_INVALID_CARD
+codes::CARD_EXPIRED          // CHARGE_CARD_EXPIRED
+codes::INSUFFICIENT_FUNDS    // CHARGE_INSUFFICIENT_FUNDS
+codes::MOMO_TIMEOUT          // CHARGE_MOMO_TIMEOUT
+codes::NETWORK_ERROR         // NETWORK_ERROR
+```
+
+## Default Trait
+
+Most input structs implement `Default`, allowing you to only specify required fields:
+
+```rust
+let input = InitializeInput {
+    email: "customer@example.com".to_string(),
+    amount: 10000,
+    ..Default::default() // All other fields set to None
+};
+```

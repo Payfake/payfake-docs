@@ -1,0 +1,87 @@
+---
+title: Customer API
+description: Manage customers and their transactions
+---
+
+# Customer API
+
+The Customer API handles customer creation and management.
+
+<Endpoint method="POST" path="/api/v1/customer" />
+
+### Create Customer
+
+Creates a new customer.
+
+**Headers:**
+```
+Authorization: Bearer sk_test_xxx
+```
+
+**Request Body:**
+
+```json
+{
+  "email": "customer@example.com",
+  "first_name": "Kofi",
+  "last_name": "Mensah",
+  "phone": "+233241234567",
+  "metadata": {
+    "user_id": "123"
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "customer_code": "CUS_xxx",
+    "email": "customer@example.com",
+    "first_name": "Kofi",
+    "last_name": "Mensah",
+    "phone": "+233241234567"
+  }
+}
+```
+
+<Endpoint method="GET" path="/api/v1/customer" />
+
+### List Customers
+
+Returns a paginated list of customers.
+
+**Query Parameters:**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `page` | 1 | Page number |
+| `per_page` | 50 | Results per page (max 100) |
+
+<Endpoint method="GET" path="/api/v1/customer/:code" />
+
+### Fetch Customer
+
+Returns details for a specific customer.
+
+<Endpoint method="PUT" path="/api/v1/customer/:code" />
+
+### Update Customer
+
+Updates customer details. All fields are optional.
+
+```json
+{
+  "first_name": "Kwame",
+  "last_name": "Asare",
+  "phone": "+233501234567"
+}
+```
+
+<Endpoint method="GET" path="/api/v1/customer/:code/transactions" />
+
+### Customer Transactions
+
+Returns all transactions for a specific customer.

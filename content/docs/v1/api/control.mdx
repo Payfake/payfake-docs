@@ -1,0 +1,62 @@
+---
+title: Control API
+description: Simulation control endpoints for testing scenarios
+---
+
+# Control API
+
+The Control API is Payfake's power layer — endpoints for manipulating the simulation engine. These have no Paystack equivalent.
+
+All control endpoints require JWT authentication.
+
+<Endpoint method="PUT" path="/api/v1/control/scenario" />
+
+### Update Scenario
+
+Configures the simulation behavior.
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Request Body:**
+
+```json
+{
+  "failure_rate": 0.3,
+  "delay_ms": 2000,
+  "force_status": "failed",
+  "error_code": "CHARGE_INSUFFICIENT_FUNDS"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `failure_rate` | float | Probability of failure (0.0 - 1.0) |
+| `delay_ms` | integer | Artificial delay in milliseconds |
+| `force_status` | string | Override all charges to this status |
+| `error_code` | string | Error code when status is `failed` |
+
+<Endpoint method="POST" path="/api/v1/control/scenario/reset" />
+
+### Reset Scenario
+
+Resets all simulation settings to defaults (0% failure, 0ms delay).
+
+<Endpoint method="POST" path="/api/v1/control/transactions/:reference/force" />
+
+### Force Transaction Outcome
+
+Forces a pending transaction to a specific terminal state.
+
+```json
+{
+  "status": "failed",
+  "error_code": "CHARGE_INSUFFICIENT_FUNDS"
+}
+```
+
+<Callout type="success" title="Deterministic Testing">
+  Use the force endpoint for deterministic test scenarios. It bypasses the scenario engine entirely — the outcome is always exactly what you specify.
+</Callout>

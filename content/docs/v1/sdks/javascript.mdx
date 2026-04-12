@@ -1,0 +1,237 @@
+---
+title: JavaScript SDK
+description: Payfake JavaScript SDK documentation
+---
+
+# JavaScript SDK
+
+The official Payfake SDK for JavaScript and TypeScript.
+
+## Installation
+
+```bash
+npm install payfake-js
+```
+
+## Quick Start
+
+```javascript
+import { createClient } from 'payfake-js';
+
+const client = createClient({
+  secretKey: 'sk_test_xxx',
+  baseURL: 'http://localhost:8080'
+});
+
+const tx = await client.transaction.initialize({
+  email: 'customer@example.com',
+  amount: 10000,
+  currency: 'GHS'
+});
+
+console.log('Authorization URL:', tx.authorizationUrl);
+console.log('Access Code:', tx.accessCode);
+console.log('Reference:', tx.reference);
+```
+
+## Authentication
+
+```javascript
+import { createClient, PayfakeError } from 'payfake-js';
+
+// Create auth client with empty secret key
+const authClient = createClient({
+  secretKey: '',
+  baseURL: 'http://localhost:8080'
+});
+
+// Register or login
+let token;
+
+try {
+  const reg = await authClient.auth.register({
+    businessName: 'Acme Store',
+    email: 'dev@acme.com',
+    password: 'secret123'
+  });
+  token = reg.token;
+  console.log('Registered:', reg.merchant.id);
+} catch (err) {
+  if (err instanceof PayfakeError && err.isCode(PayfakeError.CODE_EMAIL_TAKEN)) {
+    const login = await authClient.auth.login({
+      email: 'dev@acme.com',
+      password: 'secret123'
+    });
+    token = login.token;
+    console.log('Logged in as:', login.merchant.email);
+  }
+}
+
+// Get API keys
+const keys = await authClient.auth.getKeys(token);
+
+console.log('Public Key:', keys.publicKey);
+console.log('Secret Key:', keys.secretKey);
+
+// Create authenticated client
+const client = createClient({
+  secretKey: keys.secretKey,
+  baseURL: 'http://localhost:8080'
+});
+```
+
+## Initialize Transaction
+
+```javascript
+const tx = await client.transaction.initialize({
+  email: 'customer@example.com',
+  amount: 10000,
+  currency: 'GHS',
+  reference: 'unique-ref-001',
+  callback_url: 'https://yourapp.com/callback',
+  channels: ['card', 'mobile_money'],
+  metadata: {
+    order_id: '12345'
+  }
+});
+```
+
+## Charge Card
+
+```javascript
+try {
+  const charge = await client.charge.card({
+    accessCode: tx.accessCode,
+    cardNumber: '4111111111111111',
+    cardExpiry: '12/26',
+    cvv: '123',
+    email: 'customer@example.com'
+  });
+  
+  console.log('Status:', charge.transaction.status);
+} catch (err) {
+  if (err instanceof PayfakeError && err.isCode(PayfakeError.CODE_CHARGE_FAILED)) {
+    console.log('Charge failed:', err.fields[0]?.message || err.code);
+  }
+}
+```
+
+## Charge Mobile Money
+
+```javascript
+const momo = await client.charge.mobileMoney({
+  accessCode: tx.accessCode,
+  phone: '+233241234567',
+  provider: 'mtn',
+  email: 'customer@example.com'
+});
+
+// MoMo always returns pending immediately
+console.log('Status:', momo.transaction.status); // "pending"
+```
+
+## Verify Transaction
+
+```javascript
+const verified = await client.transaction.verify(tx.reference);
+
+if (verified.status === 'success') {
+  console.log('Payment successful');
+}
+```
+
+## Control Panel
+
+```javascript
+// Update scenario
+const scenario = await authClient.control.updateScenario(token, {
+  failureRate: 0.5,
+  delayMs: 2000
+});
+
+console.log('Failure rate:', scenario.failure_rate);
+
+// Force transaction outcome
+const forced = await authClient.control.forceTransaction(token, tx.reference, {
+  status: 'failed',
+  errorCode: 'CHARGE_INSUFFICIENT_FUNDS'
+});
+
+console.log('Forced status:', forced.status);
+
+// Reset scenario
+await authClient.control.resetScenario(token);
+
+// Get logs
+try {
+  const { logs } = await authClient.control.getLogs(token, { perPage: 5 });
+  
+  console.log(`Recent requests: ${logs.length}`);
+  for (const log of logs) {
+    console.log(`  ${log.method} ${log.path} -> ${log.status_code}`);
+  }
+} catch (err) {
+  if (err instanceof PayfakeError && err.isCode('LOGS_EMPTY')) {
+    console.log('No logs found yet');
+  }
+}
+```
+
+## Error Handling
+
+```javascript
+import { PayfakeError } from 'payfake-js';
+
+try {
+  const charge = await client.charge.card(input);
+} catch (err) {
+  if (err instanceof PayfakeError) {
+    switch (err.code) {
+      case PayfakeError.CODE_CHARGE_FAILED:
+        console.log('Charge failed:', err.fields[0]?.message);
+        break;
+      case PayfakeError.CODE_INVALID_CARD:
+        console.log('Invalid card number');
+        break;
+      case PayfakeError.CODE_CARD_EXPIRED:
+        console.log('Card has expired');
+        break;
+      default:
+        console.log('Error:', err.message);
+    }
+  }
+}
+```
+
+## Available Error Codes
+
+```javascript
+PayfakeError.CODE_EMAIL_TAKEN          // AUTH_EMAIL_TAKEN
+PayfakeError.CODE_INVALID_CREDENTIALS  // AUTH_INVALID_CREDENTIALS
+PayfakeError.CODE_UNAUTHORIZED         // AUTH_UNAUTHORIZED
+PayfakeError.CODE_CHARGE_FAILED        // CHARGE_FAILED
+PayfakeError.CODE_INVALID_CARD         // CHARGE_INVALID_CARD
+PayfakeError.CODE_CARD_EXPIRED         // CHARGE_CARD_EXPIRED
+PayfakeError.CODE_INSUFFICIENT_FUNDS   // CHARGE_INSUFFICIENT_FUNDS
+PayfakeError.CODE_MOMO_TIMEOUT         // CHARGE_MOMO_TIMEOUT
+PayfakeError.CODE_NETWORK_ERROR        // NETWORK_ERROR
+```
+
+## TypeScript Support
+
+```typescript
+import { createClient, type InitializeInput, type ChargeCardInput } from 'payfake-js';
+
+const client = createClient({
+  secretKey: 'sk_test_xxx',
+  baseURL: 'http://localhost:8080'
+});
+
+const input: InitializeInput = {
+  email: 'customer@example.com',
+  amount: 10000,
+  currency: 'GHS'
+};
+
+const tx = await client.transaction.initialize(input);
+```

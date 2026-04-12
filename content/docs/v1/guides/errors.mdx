@@ -1,0 +1,200 @@
+---
+title: Error Codes
+description: Complete reference of all Payfake error codes
+---
+
+# Error Codes
+
+Every error response includes a `code` field for programmatic handling.
+
+## Response Format
+
+```json
+{
+  "status": "error",
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "amount",
+      "message": "Amount must be greater than 0"
+    }
+  ],
+  "metadata": {
+    "timestamp": "2026-04-12T00:00:00Z",
+    "request_id": "req_1775953469582_2962"
+  },
+  "code": "VALIDATION_ERROR"
+}
+```
+
+## Auth Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `AUTH_EMAIL_TAKEN` | 409 | Email already registered |
+| `AUTH_INVALID_CREDENTIALS` | 401 | Wrong email or password |
+| `AUTH_UNAUTHORIZED` | 401 | Missing or invalid credentials |
+| `AUTH_TOKEN_EXPIRED` | 401 | JWT has expired |
+| `AUTH_TOKEN_INVALID` | 401 | JWT is malformed or tampered |
+| `AUTH_MERCHANT_NOT_FOUND` | 401 | Secret key doesn't match any merchant |
+
+## Transaction Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `TRANSACTION_NOT_FOUND` | 404 | No transaction matches the reference or ID |
+| `TRANSACTION_REFERENCE_TAKEN` | 409 | Reference already used by another transaction |
+| `TRANSACTION_INVALID_AMOUNT` | 400 | Amount is zero or negative |
+| `TRANSACTION_INVALID_CURRENCY` | 400 | Currency not supported |
+| `TRANSACTION_ALREADY_REFUNDED` | 409 | Refund already processed |
+
+## Charge Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `CHARGE_FAILED` | 400 | Generic charge failure |
+| `CHARGE_INVALID_CARD` | 400 | Card number failed validation |
+| `CHARGE_CARD_EXPIRED` | 400 | Card expiry date is in the past |
+| `CHARGE_INVALID_CVV` | 400 | CVV doesn't match |
+| `CHARGE_INVALID_PIN` | 400 | PIN is incorrect |
+| `CHARGE_INSUFFICIENT_FUNDS` | 400 | Account balance too low |
+| `CHARGE_DO_NOT_HONOR` | 400 | Issuing bank declined |
+| `CHARGE_NOT_PERMITTED` | 400 | Transaction type not allowed |
+| `CHARGE_LIMIT_EXCEEDED` | 400 | Daily or transaction limit exceeded |
+| `CHARGE_NETWORK_ERROR` | 500 | Simulated network timeout |
+| `CHARGE_MOMO_TIMEOUT` | 400 | Customer didn't respond to MoMo prompt |
+| `CHARGE_MOMO_INVALID_NUMBER` | 400 | Phone not registered on provider network |
+| `CHARGE_MOMO_LIMIT_EXCEEDED` | 400 | MoMo wallet limit exceeded |
+| `CHARGE_MOMO_PROVIDER_UNAVAILABLE` | 503 | MoMo provider temporarily down |
+| `CHARGE_BANK_INVALID_ACCOUNT` | 400 | Bank account doesn't exist |
+| `CHARGE_BANK_TRANSFER_FAILED` | 400 | Bank transfer failed |
+
+## Generic Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `VALIDATION_ERROR` | 400 | Request body failed validation |
+| `INTERNAL_ERROR` | 500 | Unexpected server error |
+| `RATE_LIMIT_EXCEEDED` | 429 | Too many requests |
+| `NOT_FOUND` | 404 | Resource not found |
+| `BAD_REQUEST` | 400 | Malformed request |
+| `METHOD_NOT_ALLOWED` | 405 | HTTP method not supported |
+
+## Checkout Page Errors
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `LOGS_EMPTY` | 404 | No logs found for merchant |
+| `CHECKOUT_NOT_FOUND` | 404 | Invalid or expired access code |
+| `CHECKOUT_ALREADY_PAID` | 400 | Transaction already completed |
+| `CHECKOUT_EXPIRED` | 400 | Payment link has expired |
+
+## Handling Errors
+
+<Tabs defaultValue="javascript">
+  <TabList>
+    <Tab value="javascript">JavaScript</Tab>
+    <Tab value="python">Python</Tab>
+    <Tab value="go">Go</Tab>
+    <Tab value="rust">Rust</Tab>
+  </TabList>
+  <TabPanels>
+    <TabPanel value="javascript">
+      ```javascript
+      try {
+        const charge = await client.charge.card(input);
+      } catch (err) {
+        if (err.code === 'CHARGE_INSUFFICIENT_FUNDS') {
+          // Ask customer for a different card
+          console.log('Insufficient funds');
+        } else if (err.code === 'CHARGE_CARD_EXPIRED') {
+          // Ask for new expiry
+          console.log('Card expired');
+        } else {
+          // Generic error
+          console.error(err.message);
+        }
+      }
+      ```
+    </TabPanel>
+    <TabPanel value="python">
+      ```python
+      from payfake import PayfakeError
+
+      try:
+          charge = client.charge.card(input)
+      except PayfakeError as e:
+          if e.is_code(PayfakeError.CODE_INSUFFICIENT_FUNDS):
+              print("Insufficient funds")
+          elif e.is_code(PayfakeError.CODE_CARD_EXPIRED):
+              print("Card expired")
+          else:
+              print(e.message)
+      ```
+    </TabPanel>
+    <TabPanel value="go">
+      ```go
+      import payfake "github.com/payfake/payfake-go"
+
+      charge, err := client.Charge.Card(ctx, input)
+      if err != nil {
+          if payfake.IsCode(err, payfake.CodeInsufficientFunds) {
+              fmt.Println("Insufficient funds")
+          } else if payfake.IsCode(err, payfake.CodeCardExpired) {
+              fmt.Println("Card expired")
+          } else {
+              fmt.Println(err.Error())
+          }
+      }
+      ```
+    </TabPanel>
+    <TabPanel value="rust">
+      ```rust
+      use payfake::errors::codes;
+
+      match client.charge.card(input).await {
+          Ok(charge) => println!("Success"),
+          Err(e) if e.is_code(codes::INSUFFICIENT_FUNDS) => {
+              println!("Insufficient funds");
+          }
+          Err(e) if e.is_code(codes::CARD_EXPIRED) => {
+              println!("Card expired");
+          }
+          Err(e) => eprintln!("Error: {}", e),
+      }
+      ```
+    </TabPanel>
+  </TabPanels>
+</Tabs>
+
+## Field Errors
+
+Some errors include field-level validation details:
+
+```json
+{
+  "status": "error",
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "card_number",
+      "message": "Invalid card number"
+    },
+    {
+      "field": "cvv",
+      "message": "CVV must be 3 or 4 digits"
+    }
+  ],
+  "code": "VALIDATION_ERROR"
+}
+```
+
+Access field errors in SDKs:
+
+```javascript
+if (err.code === 'VALIDATION_ERROR') {
+  err.fields.forEach(field => {
+    console.log(`${field.field}: ${field.message}`);
+  });
+}
+```

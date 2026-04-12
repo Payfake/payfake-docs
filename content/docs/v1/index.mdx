@@ -1,0 +1,39 @@
+---
+title: Introduction
+description: Self-hostable Paystack-compatible payment simulator for African developers
+---
+
+# Introduction
+
+Payfake is a self-hostable, Paystack-compatible payment simulator built for African developers. Test every payment scenario — card charges, mobile money flows, bank transfers, webhook delivery, failure simulation — without touching real money or depending on an external sandbox.
+
+## Why Payfake
+
+Paystack's test mode works but it has real limitations:
+
+- You can't force a specific failure scenario deterministically
+- You can't simulate MoMo timeouts, network errors, or flaky webhooks
+- You can't reproduce a race condition between webhook delivery and your DB write
+- You're dependent on Paystack's infrastructure even in development
+- You can't work offline
+
+Payfake fills that gap. It's a glass box — you see every request, every response, every webhook attempt. You control every outcome.
+
+## Features
+
+- **Paystack-compatible API** — same URL structure, same payload keys, same response shapes
+- **Card, Mobile Money and Bank Transfer** — including Ghana-specific channels (MTN MoMo, Vodafone Cash, AirtelTigo)
+- **Webhook delivery** — fires events with HMAC-SHA512 signatures identical to Paystack's
+- **Scenario engine** — configure failure rates, artificial delays, and forced outcomes
+- **Force endpoint** — deterministically force any pending transaction to any terminal state
+- **Introspection logs** — every request and response stored and queryable
+- **React checkout page** — hosted payment popup served separately
+- **Docker support** — single command to run the full stack
+
+## How It Works
+
+Point your app at `http://localhost:8080` instead of `https://api.paystack.co`. Change one line in your `.env`. Everything else stays the same.
+
+<Callout type="success" title="Drop-in Replacement">
+  Payfake maintains the exact same API contract as Paystack. Your existing Paystack integration code works without modification — just change the base URL.
+</Callout>

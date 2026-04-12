@@ -1,0 +1,241 @@
+---
+title: Webhooks
+description: Handle payment events with webhooks
+---
+
+# Webhooks
+
+Payfake fires webhooks to your configured `callback_url` after every terminal transaction state change.
+
+## Events
+
+| Event | Description |
+|-------|-------------|
+| `charge.success` | Charge completed successfully |
+| `charge.failed` | Charge failed |
+| `transfer.success` | Transfer completed |
+| `transfer.failed` | Transfer failed |
+| `refund.processed` | Refund was processed |
+
+## Payload
+
+```json
+{
+  "event": "charge.success",
+  "data": {
+    "id": "TXN_xxx",
+    "reference": "unique-ref-001",
+    "amount": 10000,
+    "currency": "GHS",
+    "status": "success",
+    "channel": "card",
+    "customer": {
+      "email": "customer@example.com",
+      "first_name": "Kofi",
+      "last_name": "Mensah"
+    },
+    "paid_at": "2026-04-12T00:00:00Z"
+  }
+}
+```
+
+## Signature Verification
+
+Payfake signs every webhook with your secret key using HMAC-SHA512. The signature is sent in the `X-Paystack-Signature` header.
+
+<Tabs defaultValue="go">
+  <TabList>
+    <Tab value="go">Go</Tab>
+    <Tab value="python">Python</Tab>
+    <Tab value="javascript">JavaScript</Tab>
+    <Tab value="rust">Rust</Tab>
+  </TabList>
+  <TabPanels>
+    <TabPanel value="go">
+      ```go
+      import (
+          "crypto/hmac"
+          "crypto/sha512"
+          "encoding/hex"
+          "io"
+          "net/http"
+      )
+
+      func webhookHandler(w http.ResponseWriter, r *http.Request) {
+          body, _ := io.ReadAll(r.Body)
+          signature := r.Header.Get("X-Paystack-Signature")
+          secretKey := "sk_test_xxx"
+
+          mac := hmac.New(sha512.New, []byte(secretKey))
+          mac.Write(body)
+          expected := hex.EncodeToString(mac.Sum(nil))
+
+          if !hmac.Equal([]byte(expected), []byte(signature)) {
+              http.Error(w, "Invalid signature", http.StatusUnauthorized)
+              return
+          }
+
+          // Process webhook
+          w.WriteHeader(http.StatusOK)
+      }
+      ```
+    </TabPanel>
+    <TabPanel value="python">
+      ```python
+      import hmac
+      import hashlib
+      from flask import Flask, request
+
+      app = Flask(__name__)
+
+      @app.route('/webhook', methods=['POST'])
+      def webhook():
+          signature = request.headers.get('X-Paystack-Signature')
+          secret_key = 'sk_test_xxx'
+          
+          expected = hmac.new(
+              secret_key.encode(),
+              request.data,
+              hashlib.sha512
+          ).hexdigest()
+          
+          if not hmac.compare_digest(expected, signature):
+              return 'Invalid signature', 401
+          
+          # Process webhook
+          return 'OK', 200
+      ```
+    </TabPanel>
+    <TabPanel value="javascript">
+      ```javascript
+      import { createHmac } from 'crypto';
+
+      app.post('/webhook', (req, res) => {
+          const signature = req.headers['x-paystack-signature'];
+          const secretKey = 'sk_test_xxx';
+          
+          const expected = createHmac('sha512', secretKey)
+              .update(JSON.stringify(req.body))
+              .digest('hex');
+          
+          if (expected !== signature) {
+              return res.status(401).send('Invalid signature');
+          }
+          
+          // Process webhook
+          res.sendStatus(200);
+      });
+      ```
+    </TabPanel>
+    <TabPanel value="rust">
+      ```rust
+      use axum::{
+          body::Bytes,
+          http::{HeaderMap, StatusCode},
+          response::IntoResponse,
+      };
+      use hmac::{Hmac, Mac};
+      use sha2::Sha512;
+
+      type HmacSha512 = Hmac<Sha512>;
+
+      async fn webhook_handler(headers: HeaderMap, body: Bytes) -> impl IntoResponse {
+          let signature = headers
+              .get("X-Paystack-Signature")
+              .and_then(|v| v.to_str().ok())
+              .unwrap_or("");
+          
+          let secret_key = "sk_test_xxx";
+          
+          let mut mac = HmacSha512::new_from_slice(secret_key.as_bytes())
+              .expect("HMAC can take key of any size");
+          mac.update(&body);
+          
+          let expected = hex::encode(mac.finalize().into_bytes());
+          
+          if expected != signature {
+              return (StatusCode::UNAUTHORIZED, "Invalid signature").into_response();
+          }
+          
+          // Process webhook
+          (StatusCode::OK, "OK").into_response()
+      }
+      ```
+    </TabPanel>
+  </TabPanels>
+</Tabs>
+
+## Webhook Delivery
+
+Webhooks are delivered asynchronously after a transaction reaches a terminal state:
+
+1. **Card payments**: Immediate after processing
+2. **Mobile Money**: After simulated delay (configured via `delay_ms`)
+3. **Bank transfers**: After simulated processing time
+
+Failed deliveries are retried up to 3 times with exponential backoff.
+
+## Idempotency
+
+Webhooks include an `id` field. Use this to ensure idempotent processing:
+
+```javascript
+const processedEvents = new Set();
+
+app.post('/webhook', (req, res) => {
+    const eventId = req.body.data.id;
+    
+    if (processedEvents.has(eventId)) {
+        return res.sendStatus(200); // Already processed
+    }
+    
+    // Process webhook
+    processedEvents.add(eventId);
+    
+    res.sendStatus(200);
+});
+```
+
+## Local Testing
+
+Use ngrok to receive webhooks locally:
+
+```bash
+ngrok http 3000
+```
+
+Set your `callback_url` to the ngrok URL:
+
+```javascript
+const tx = await client.transaction.initialize({
+    email: 'customer@example.com',
+    amount: 10000,
+    callback_url: 'https://abc123.ngrok.io/webhook'
+});
+```
+
+## Testing Webhooks
+
+Force a transaction to trigger webhooks:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/control/transactions/REF_xxx/force \
+  -H "Authorization: Bearer <jwt_token>" \
+  -d '{"status": "success"}'
+```
+
+View webhook delivery attempts:
+
+```bash
+curl http://localhost:8080/api/v1/control/webhooks \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+## Best Practices
+
+- **Verify signatures**: Always verify the HMAC signature
+- **Respond quickly**: Return 200 OK immediately, process asynchronously
+- **Idempotency**: Handle duplicate webhooks gracefully
+- **Log everything**: Store raw webhook payloads for debugging
+- **Monitor failures**: Set up alerts for failed webhook deliveries
+```

@@ -1,0 +1,93 @@
+---
+title: Testing Scenarios
+description: Simulate different payment outcomes for testing
+---
+
+# Testing Scenarios
+
+Payfake's scenario engine lets you simulate any payment outcome deterministically.
+
+## Global Scenario Configuration
+
+Configure failure rates and delays for all transactions:
+
+```json
+{
+  "failure_rate": 0.3,
+  "delay_ms": 2000
+}
+```
+
+This makes 30% of charges fail with a 2 second delay.
+
+## Forcing Specific Outcomes
+
+Force a specific transaction to a terminal state:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/control/transactions/REF_xxx/force \
+  -H "Authorization: Bearer <jwt_token>" \
+  -d '{"status": "failed", "error_code": "CHARGE_INSUFFICIENT_FUNDS"}'
+```
+
+## Common Test Scenarios
+
+### Test Successful Payment
+
+```bash
+# Reset scenario to defaults
+curl -X POST http://localhost:8080/api/v1/control/scenario/reset \
+  -H "Authorization: Bearer <jwt_token>"
+```
+
+### Test Card Declined
+
+```bash
+curl -X POST http://localhost:8080/api/v1/control/transactions/REF_xxx/force \
+  -H "Authorization: Bearer <jwt_token>" \
+  -d '{"status": "failed", "error_code": "CHARGE_DO_NOT_HONOR"}'
+```
+
+### Test MoMo Timeout
+
+```bash
+curl -X POST http://localhost:8080/api/v1/control/transactions/REF_xxx/force \
+  -H "Authorization: Bearer <jwt_token>" \
+  -d '{"status": "failed", "error_code": "CHARGE_MOMO_TIMEOUT"}'
+```
+
+### Test Webhook Delivery
+
+Configure a long delay to test webhook handling:
+
+```bash
+curl -X PUT http://localhost:8080/api/v1/control/scenario \
+  -H "Authorization: Bearer <jwt_token>" \
+  -d '{"delay_ms": 10000}'
+```
+
+The webhook fires after 10 seconds.
+
+### Test Race Conditions
+
+Force success then immediately verify:
+
+```bash
+# Terminal 1: Force success
+curl -X POST http://localhost:8080/api/v1/control/transactions/REF_xxx/force \
+  -H "Authorization: Bearer <jwt_token>" \
+  -d '{"status": "success"}'
+
+# Terminal 2: Simultaneous verify
+curl http://localhost:8080/api/v1/transaction/verify/REF_xxx \
+  -H "Authorization: Bearer sk_test_xxx"
+```
+
+## Resetting After Tests
+
+Always reset the scenario after testing:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/control/scenario/reset \
+  -H "Authorization: Bearer <jwt_token>"
+```

@@ -1,0 +1,91 @@
+---
+title: Auth API
+description: Authentication endpoints for Payfake
+---
+
+# Auth API
+
+The Auth API handles merchant registration, login, and API key management.
+
+<Endpoint method="POST" path="/api/v1/auth/register" />
+
+### Register
+
+Creates a new merchant account and returns API keys.
+
+**Request Body:**
+
+```json
+{
+  "business_name": "Acme Store",
+  "email": "dev@acme.com",
+  "password": "secret123"
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Merchant registered",
+  "data": {
+    "merchant": {
+      "id": "MER_xxx",
+      "business_name": "Acme Store",
+      "email": "dev@acme.com",
+      "public_key": "pk_test_xxx",
+      "secret_key": "sk_test_xxx"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIs..."
+  }
+}
+```
+
+<Endpoint method="POST" path="/api/v1/auth/login" />
+
+### Login
+
+Authenticates a merchant and returns a JWT token.
+
+**Request Body:**
+
+```json
+{
+  "email": "dev@acme.com",
+  "password": "secret123"
+}
+```
+
+<Endpoint method="GET" path="/api/v1/auth/keys" />
+
+### Get Keys
+
+Returns the merchant's API keys.
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "public_key": "pk_test_xxx",
+    "secret_key": "sk_test_xxx"
+  }
+}
+```
+
+<Endpoint method="POST" path="/api/v1/auth/keys/regenerate" />
+
+### Regenerate Keys
+
+Generates new API keys. The old secret key is immediately invalidated.
+
+<Callout type="warning" title="Breaking Change">
+  Regenerating keys invalidates the old secret key immediately. Update your application's secret key to avoid service interruption.
+</Callout>

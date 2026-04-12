@@ -1,0 +1,194 @@
+---
+title: Go SDK
+description: Payfake Go SDK documentation
+---
+
+# Go SDK
+
+The official Payfake SDK for Go.
+
+## Installation
+
+```bash
+go get github.com/payfake/payfake-go
+```
+
+## Quick Start
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    payfake "github.com/payfake/payfake-go"
+)
+
+func main() {
+    client := payfake.New(payfake.Config{
+        SecretKey: "sk_test_xxx",
+        BaseURL:   "http://localhost:8080",
+    })
+
+    ctx := context.Background()
+
+    tx, err := client.Transaction.Initialize(ctx, payfake.InitializeInput{
+        Email:    "customer@example.com",
+        Amount:   10000,
+        Currency: "GHS",
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Authorization URL: %s\n", tx.AuthorizationURL)
+    fmt.Printf("Access Code: %s\n", tx.AccessCode)
+    fmt.Printf("Reference: %s\n", tx.Reference)
+}
+```
+
+## Authentication
+
+```go
+// Create auth client with empty secret key
+authClient := payfake.New(payfake.Config{
+    SecretKey: "",
+    BaseURL:   "http://localhost:8080",
+})
+
+// Register or login
+loginResp, err := authClient.Auth.Login(ctx, payfake.LoginInput{
+    Email:    "dev@acme.com",
+    Password: "secret123",
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+// Get API keys
+keys, err := authClient.Auth.GetKeys(ctx, loginResp.Token)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Create authenticated client
+client := payfake.New(payfake.Config{
+    SecretKey: keys.SecretKey,
+    BaseURL:   "http://localhost:8080",
+})
+```
+
+## Initialize Transaction
+
+```go
+tx, err := client.Transaction.Initialize(ctx, payfake.InitializeInput{
+    Email:       "customer@example.com",
+    Amount:      10000,
+    Currency:    "GHS",
+    Reference:   "unique-ref-001",
+    CallbackURL: "https://yourapp.com/callback",
+    Channels:    []string{"card", "mobile_money"},
+    Metadata: map[string]interface{}{
+        "order_id": "12345",
+    },
+})
+```
+
+## Charge Card
+
+```go
+charge, err := client.Charge.Card(ctx, payfake.ChargeCardInput{
+    AccessCode: tx.AccessCode,
+    CardNumber: "4111111111111111",
+    CardExpiry: "12/26",
+    CVV:        "123",
+    Email:      "customer@example.com",
+})
+
+fmt.Printf("Status: %s\n", charge.Transaction.Status)
+```
+
+## Charge Mobile Money
+
+```go
+momo, err := client.Charge.MobileMoney(ctx, payfake.ChargeMomoInput{
+    AccessCode: tx.AccessCode,
+    Phone:      "+233241234567",
+    Provider:   "mtn",
+    Email:      "customer@example.com",
+})
+
+// MoMo always returns pending immediately
+fmt.Printf("Status: %s\n", momo.Transaction.Status) // "pending"
+```
+
+## Verify Transaction
+
+```go
+verified, err := client.Transaction.Verify(ctx, tx.Reference)
+
+if verified.Status == "success" {
+    fmt.Println("Payment successful")
+}
+```
+
+## Control Panel
+
+```go
+// Update scenario
+failureRate := 0.5
+delayMs := 2000
+
+scenario, err := authClient.Control.UpdateScenario(ctx, token, payfake.UpdateScenarioInput{
+    FailureRate: &failureRate,
+    DelayMS:     &delayMs,
+})
+
+// Force transaction outcome
+status := "failed"
+errorCode := "CHARGE_INSUFFICIENT_FUNDS"
+
+forced, err := authClient.Control.ForceTransaction(ctx, token, tx.Reference, payfake.ForceTransactionInput{
+    Status:    status,
+    ErrorCode: errorCode,
+})
+
+// Reset scenario
+_, err = authClient.Control.ResetScenario(ctx, token)
+
+// Get logs
+logs, err := authClient.Control.GetLogs(ctx, token, payfake.ListOptions{
+    Page:    1,
+    PerPage: 5,
+})
+```
+
+## Error Handling
+
+```go
+charge, err := client.Charge.Card(ctx, input)
+if err != nil {
+    if payfake.IsCode(err, payfake.CodeChargeFailed) {
+        fmt.Println("Charge failed")
+        if len(err.Fields()) > 0 {
+            fmt.Printf("Reason: %s\n", err.Fields()[0].Message)
+        }
+    } else {
+        log.Fatal(err)
+    }
+}
+```
+
+## Available Error Codes
+
+```go
+payfake.CodeEmailTaken           // AUTH_EMAIL_TAKEN
+payfake.CodeInvalidCredentials   // AUTH_INVALID_CREDENTIALS
+payfake.CodeUnauthorized         // AUTH_UNAUTHORIZED
+payfake.CodeChargeFailed         // CHARGE_FAILED
+payfake.CodeInvalidCard          // CHARGE_INVALID_CARD
+payfake.CodeCardExpired          // CHARGE_CARD_EXPIRED
+payfake.CodeInsufficientFunds    // CHARGE_INSUFFICIENT_FUNDS
+payfake.CodeMomoTimeout          // CHARGE_MOMO_TIMEOUT
+```

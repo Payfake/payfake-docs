@@ -1,0 +1,23 @@
+---
+title: Configuration
+description: Environment variables and configuration options
+---
+
+# Configuration
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `APP_NAME` | No | `payfake` | Application name |
+| `APP_ENV` | No | `development` | Environment (`development` or `production`) |
+| `APP_PORT` | No | `8080` | HTTP server port |
+| `FRONTEND_URL` | No | `http://localhost:3000` | Dashboard frontend URL for CORS |
+| `DB_HOST` | Yes | `localhost` | PostgreSQL host |
+| `DB_PORT` | No | `5432` | PostgreSQL port |
+| `DB_USER` | Yes | — | PostgreSQL user |
+| `DB_PASSWORD` | Yes | — | PostgreSQL password |
+| `DB_NAME` | Yes | — | PostgreSQL database name |
+| `DB_SSLMODE` | No | `disable` | PostgreSQL SSL mode |
+| `JWT_SECRET` | Yes | — | Secret for signing JWT tokens |
+| `JWT_EXPIRY_HOURS` | No | `24` | JWT token expiry in hours |

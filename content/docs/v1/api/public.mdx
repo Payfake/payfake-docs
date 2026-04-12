@@ -1,0 +1,105 @@
+---
+title: Public Checkout API
+description: Public endpoints for the hosted checkout page
+---
+
+# Public Checkout API
+
+Public endpoints are called from the React checkout page in the customer's browser. No authentication required — secured by `access_code`.
+
+<Endpoint method="GET" path="/api/v1/public/transaction/:access_code" />
+
+### Fetch Transaction
+
+Returns transaction details for the checkout page.
+
+**Response (Pending):**
+
+```json
+{
+  "status": "success",
+  "message": "Transaction fetched",
+  "data": {
+    "access_code": "ACC_xxx",
+    "amount": 10000,
+    "currency": "GHS",
+    "status": "pending",
+    "reference": "unique-ref-001",
+    "callback_url": "https://yourapp.com/callback",
+    "merchant": {
+      "business_name": "Acme Store",
+      "public_key": "pk_test_xxx"
+    },
+    "customer": {
+      "email": "customer@example.com",
+      "first_name": "Kofi",
+      "last_name": "Mensah"
+    }
+  }
+}
+```
+
+**Response (Already Paid):**
+
+```json
+{
+  "status": "success",
+  "message": "Payment already completed",
+  "data": {
+    "status": "success",
+    "reference": "unique-ref-001"
+  }
+}
+```
+
+<Endpoint method="POST" path="/api/v1/public/charge/card" />
+
+### Charge Card
+
+Processes a card payment from the checkout page.
+
+**Request Body:**
+
+```json
+{
+  "access_code": "ACC_xxx",
+  "card_number": "4111111111111111",
+  "card_expiry": "12/26",
+  "cvv": "123",
+  "email": "customer@example.com"
+}
+```
+
+<Endpoint method="POST" path="/api/v1/public/charge/mobile_money" />
+
+### Charge Mobile Money
+
+Processes a mobile money payment from the checkout page.
+
+**Request Body:**
+
+```json
+{
+  "access_code": "ACC_xxx",
+  "phone": "+233241234567",
+  "provider": "mtn",
+  "email": "customer@example.com"
+}
+```
+
+<Endpoint method="POST" path="/api/v1/public/charge/bank" />
+
+### Charge Bank
+
+Processes a bank transfer payment from the checkout page.
+
+**Request Body:**
+
+```json
+{
+  "access_code": "ACC_xxx",
+  "bank_code": "GCB",
+  "account_number": "1234567890",
+  "email": "customer@example.com"
+}
+```

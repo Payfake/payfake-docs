@@ -1,0 +1,88 @@
+---
+title: Transaction API
+description: Initialize and manage payment transactions
+---
+
+# Transaction API
+
+The Transaction API handles payment initialization, verification, and management.
+
+<Endpoint method="POST" path="/api/v1/transaction/initialize" />
+
+### Initialize Transaction
+
+Creates a new pending transaction and returns an access code for the checkout flow.
+
+**Headers:**
+```
+Authorization: Bearer sk_test_xxx
+Content-Type: application/json
+```
+
+**Request Body:**
+
+```json
+{
+  "email": "customer@example.com",
+  "amount": 10000,
+  "currency": "GHS",
+  "reference": "unique-ref-001",
+  "callback_url": "https://yourapp.com/callback",
+  "channels": ["card", "mobile_money"],
+  "metadata": {
+    "order_id": "12345"
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | string | Yes | Customer email |
+| `amount` | integer | Yes | Amount in smallest unit (pesewas for GHS) |
+| `currency` | string | No | `GHS`, `NGN`, `KES`. Default: `GHS` |
+| `reference` | string | No | Unique reference. Auto-generated if omitted |
+| `callback_url` | string | No | URL to redirect after payment |
+| `channels` | array | No | Payment channels to offer |
+| `metadata` | object | No | Custom key-value data |
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Transaction initialized",
+  "data": {
+    "authorization_url": "http://localhost:3000/ACC_xxx",
+    "access_code": "ACC_A1B2C3D4E5F6",
+    "reference": "unique-ref-001"
+  }
+}
+```
+
+<Endpoint method="GET" path="/api/v1/transaction/verify/:reference" />
+
+### Verify Transaction
+
+Confirms the final status of a transaction.
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "reference": "unique-ref-001",
+    "amount": 10000,
+    "currency": "GHS",
+    "status": "success",
+    "customer": {
+      "email": "customer@example.com"
+    },
+    "paid_at": "2026-04-12T00:00:00Z"
+  }
+}
+```
+
+<Callout>
+  Always verify transactions on your backend. Never trust client-side success messages alone.
+</Callout>

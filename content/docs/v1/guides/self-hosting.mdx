@@ -1,0 +1,167 @@
+---
+title: Self-Hosting
+description: Deploy Payfake to production
+---
+
+# Self-Hosting
+
+Guide to deploying Payfake in production environments.
+
+## Deployment Options
+
+### Docker Compose (Recommended)
+
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=production
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=payfake
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=payfake
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+### Kubernetes
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payfake-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payfake-api
+  template:
+    metadata:
+      labels:
+        app: payfake-api
+    spec:
+      containers:
+      - name: api
+        image: payfake/api:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: APP_ENV
+          value: "production"
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: payfake-secrets
+              key: db-host
+```
+
+### Fly.io
+
+```toml
+# fly.toml
+app = "payfake-api"
+primary_region = "lhr"
+
+[build]
+  image = "payfake/api:latest"
+
+[env]
+  APP_ENV = "production"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+```
+
+## Production Checklist
+
+- [ ] Set `APP_ENV=production`
+- [ ] Use strong `JWT_SECRET` (minimum 32 characters)
+- [ ] Enable SSL for PostgreSQL (`DB_SSLMODE=require`)
+- [ ] Set up database backups
+- [ ] Configure logging aggregation
+- [ ] Set up monitoring and alerting
+- [ ] Use a reverse proxy (nginx/Caddy) for TLS termination
+- [ ] Configure rate limiting for production traffic
+
+## Environment Variables for Production
+
+```env
+APP_ENV=production
+APP_PORT=8080
+DB_HOST=your-db-host
+DB_PORT=5432
+DB_USER=payfake
+DB_PASSWORD=strong-password
+DB_NAME=payfake
+DB_SSLMODE=require
+JWT_SECRET=your-very-long-secret-key
+JWT_EXPIRY_HOURS=24
+FRONTEND_URL=https://checkout.yourdomain.com
+```
+
+## Reverse Proxy Example (nginx)
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name api.payfake.co;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+## Database Backups
+
+```bash
+# Daily backup script
+#!/bin/bash
+pg_dump -h $DB_HOST -U $DB_USER $DB_NAME > backup_$(date +%Y%m%d).sql
+
+# Upload to S3 or backup storage
+aws s3 cp backup_*.sql s3://payfake-backups/
+```
+
+## Health Checks
+
+```bash
+# Kubernetes liveness probe
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+```
