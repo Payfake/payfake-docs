@@ -5,13 +5,26 @@ description: Process card, mobile money, and bank payments
 
 # Charge API
 
-Process payments through various channels.
+Process payments through various channels. Payfake supports multi-step charge flows that may require additional customer input like PIN, OTP, birthday verification, or 3D Secure.
+
+## Flow States
+
+| Flow Status | Description | Next Action |
+|-------------|-------------|-------------|
+| `send_pin` | PIN required | Submit PIN |
+| `send_otp` | OTP verification required | Submit OTP |
+| `send_birthday` | Birthday validation required | Submit birthday |
+| `send_address` | Address information required | Submit address |
+| `open_url` | 3D Secure verification | Open `three_ds_url` in iframe |
+| `pay_offline` | MoMo prompt sent to phone | Poll verify endpoint |
+| `success` | Charge completed successfully | - |
+| `failed` | Charge failed | - |
 
 <Endpoint method="POST" path="/api/v1/charge/card" />
 
 ### Charge Card
 
-Processes a card payment.
+Processes a card payment. May return intermediate flow states.
 
 **Request Body:**
 
@@ -22,6 +35,23 @@ Processes a card payment.
   "card_expiry": "12/26",
   "cvv": "123",
   "email": "customer@example.com"
+}
+```
+
+**Response (Intermediate - PIN Required):**
+
+```json
+{
+  "status": "success",
+  "message": "Enter your card PIN",
+  "data": {
+    "charge": {
+      "id": "CHG_xxx",
+      "flow_status": "send_pin"
+    },
+    "display_text": "Enter the PIN for card ending in 1111",
+    "reference": "TXN_xxx"
+  }
 }
 ```
 
@@ -44,7 +74,7 @@ Processes a card payment.
 
 ### Charge Mobile Money
 
-Processes a mobile money payment.
+Processes a mobile money payment. May require OTP verification or wait for phone approval.
 
 **Request Body:**
 
@@ -60,9 +90,163 @@ Processes a mobile money payment.
 | Provider | Value |
 |----------|-------|
 | MTN Mobile Money | `mtn` |
-| Vodafone Cash | `vodafone` |
-| AirtelTigo Money | `airteltigo` |
+| Telecel (Vodafone) | `vodafone` |
+| AT (AirtelTigo) | `airteltigo` |
+
+**Response (OTP Required):**
+
+```json
+{
+  "status": "success",
+  "message": "Enter the OTP sent to your phone",
+  "data": {
+    "charge": {
+      "id": "CHG_xxx",
+      "flow_status": "send_otp",
+      "momo_phone": "+233241234567",
+      "momo_provider": "mtn"
+    },
+    "display_text": "Enter the OTP sent to +23354***293",
+    "reference": "TXN_xxx"
+  }
+}
+```
+
+**Response (Waiting for Phone Approval):**
+
+```json
+{
+  "status": "success",
+  "message": "Check your phone to approve the payment",
+  "data": {
+    "charge": {
+      "id": "CHG_xxx",
+      "flow_status": "pay_offline"
+    },
+    "display_text": "Approve the payment on your phone",
+    "reference": "TXN_xxx"
+  }
+}
+```
 
 <Callout type="warning" title="Async Processing">
-  Mobile money charges always return `status: "pending"` immediately. The final outcome arrives via webhook. Always implement a webhook handler.
+  When `flow_status` is `pay_offline`, the final outcome arrives via webhook. Poll `/public/transaction/verify/:reference` to check status.
 </Callout>
+
+---
+
+## Multi-Step Flow Endpoints
+
+<Endpoint method="POST" path="/api/v1/charge/submit_pin" />
+
+### Submit PIN
+
+Submit the PIN for a transaction that requires it.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx",
+  "pin": "1234"
+}
+```
+
+**Response:**
+
+Same response shape as the initial charge. Check `flow_status` for next step.
+
+---
+
+<Endpoint method="POST" path="/api/v1/charge/submit_otp" />
+
+### Submit OTP
+
+Submit the OTP sent to the customer's phone.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx",
+  "otp": "123456"
+}
+```
+
+---
+
+<Endpoint method="POST" path="/api/v1/charge/resend_otp" />
+
+### Resend OTP
+
+Request a new OTP for the transaction.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx"
+}
+```
+
+---
+
+<Endpoint method="POST" path="/api/v1/charge/submit_birthday" />
+
+### Submit Birthday
+
+Submit birthday for age verification.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx",
+  "birthday": "1990-01-01"
+}
+```
+
+---
+
+<Endpoint method="POST" path="/api/v1/charge/submit_address" />
+
+### Submit Address
+
+Submit address information required for the transaction.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx",
+  "address": "123 Independence Ave",
+  "city": "Accra",
+  "postal_code": "00233"
+}
+```
+
+---
+
+<Endpoint method="GET" path="/api/v1/charge/:reference" />
+
+### Fetch Charge
+
+Retrieve the current state of a charge.
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "CHG_xxx",
+    "transaction_id": "TXN_xxx",
+    "channel": "mobile_money",
+    "status": "pending",
+    "flow_status": "pay_offline",
+    "momo_phone": "+233241234567",
+    "momo_provider": "mtn",
+    "created_at": "2026-04-17T16:36:44Z"
+  }
+}
+```

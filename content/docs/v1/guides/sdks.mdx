@@ -5,7 +5,7 @@ description: Official Payfake SDKs for multiple languages
 
 # SDKs
 
-Official Payfake SDKs provide idiomatic wrappers around the Payfake API.
+Official Payfake SDKs provide idiomatic wrappers around the Payfake API, including full support for multi-step charge flows.
 
 ## Available SDKs
 
@@ -211,3 +211,232 @@ All SDKs follow the same authentication pattern:
     </TabPanel>
   </TabPanels>
 </Tabs>
+
+## Handling Multi-Step Charge Flows
+
+Charges may return intermediate `flow_status` values requiring additional input. All SDKs provide methods for each flow step.
+
+### PIN Verification Flow
+
+<Tabs defaultValue="javascript">
+  <TabList>
+    <Tab value="javascript">JavaScript</Tab>
+    <Tab value="python">Python</Tab>
+    <Tab value="go">Go</Tab>
+  </TabList>
+  <TabPanels>
+    <TabPanel value="javascript">
+      ```javascript
+      const charge = await client.charge.card({
+        access_code: "ACC_xxx",
+        card_number: "4111111111111111",
+        card_expiry: "12/26",
+        cvv: "123"
+      });
+
+      if (charge.data.charge.flow_status === 'send_pin') {
+        const result = await client.charge.submitPIN({
+          reference: charge.data.reference,
+          pin: "1234"
+        });
+        console.log(result.data.charge.flow_status);
+      }
+      ```
+    </TabPanel>
+    <TabPanel value="python">
+      ```python
+      charge = client.charge.card(
+          access_code="ACC_xxx",
+          card_number="4111111111111111",
+          card_expiry="12/26",
+          cvv="123"
+      )
+
+      if charge.data.charge.flow_status == 'send_pin':
+          result = client.charge.submit_pin(
+              reference=charge.data.reference,
+              pin="1234"
+          )
+          print(result.data.charge.flow_status)
+      ```
+    </TabPanel>
+    <TabPanel value="go">
+      ```go
+      charge, _ := client.Charge.Card(ctx, payfake.ChargeCardInput{
+          AccessCode: "ACC_xxx",
+          CardNumber: "4111111111111111",
+          CardExpiry: "12/26",
+          CVV:        "123",
+      })
+
+      if charge.Data.Charge.FlowStatus == "send_pin" {
+          result, _ := client.Charge.SubmitPIN(ctx, payfake.SubmitPINInput{
+              Reference: charge.Data.Reference,
+              PIN:       "1234",
+          })
+          fmt.Println(result.Data.Charge.FlowStatus)
+      }
+      ```
+    </TabPanel>
+  </TabPanels>
+</Tabs>
+
+### OTP Verification Flow
+
+<Tabs defaultValue="javascript">
+  <TabList>
+    <Tab value="javascript">JavaScript</Tab>
+    <Tab value="python">Python</Tab>
+    <Tab value="go">Go</Tab>
+  </TabList>
+  <TabPanels>
+    <TabPanel value="javascript">
+      ```javascript
+      const charge = await client.charge.mobileMoney({
+        access_code: "ACC_xxx",
+        phone: "+233241234567",
+        provider: "mtn"
+      });
+
+      if (charge.data.charge.flow_status === 'send_otp') {
+        // Submit OTP
+        const result = await client.charge.submitOTP({
+          reference: charge.data.reference,
+          otp: "123456"
+        });
+
+        // Or resend OTP
+        await client.charge.resendOTP({
+          reference: charge.data.reference
+        });
+      }
+
+      if (charge.data.charge.flow_status === 'pay_offline') {
+        // Poll for status
+        const verify = await client.transaction.verify(charge.data.reference);
+        console.log(verify.status);
+      }
+      ```
+    </TabPanel>
+    <TabPanel value="python">
+      ```python
+      charge = client.charge.mobile_money(
+          access_code="ACC_xxx",
+          phone="+233241234567",
+          provider="mtn"
+      )
+
+      if charge.data.charge.flow_status == 'send_otp':
+          # Submit OTP
+          result = client.charge.submit_otp(
+              reference=charge.data.reference,
+              otp="123456"
+          )
+
+          # Or resend OTP
+          client.charge.resend_otp(reference=charge.data.reference)
+
+      if charge.data.charge.flow_status == 'pay_offline':
+          # Poll for status
+          verify = client.transaction.verify(charge.data.reference)
+          print(verify.status)
+      ```
+    </TabPanel>
+    <TabPanel value="go">
+      ```go
+      charge, _ := client.Charge.MobileMoney(ctx, payfake.ChargeMobileMoneyInput{
+          AccessCode: "ACC_xxx",
+          Phone:      "+233241234567",
+          Provider:   "mtn",
+      })
+
+      if charge.Data.Charge.FlowStatus == "send_otp" {
+          // Submit OTP
+          result, _ := client.Charge.SubmitOTP(ctx, payfake.SubmitOTPInput{
+              Reference: charge.Data.Reference,
+              OTP:       "123456",
+          })
+
+          // Or resend OTP
+          client.Charge.ResendOTP(ctx, payfake.ResendOTPInput{
+              Reference: charge.Data.Reference,
+          })
+      }
+
+      if charge.Data.Charge.FlowStatus == "pay_offline" {
+          // Poll for status
+          verify, _ := client.Transaction.Verify(ctx, charge.Data.Reference)
+          fmt.Println(verify.Status)
+      }
+      ```
+    </TabPanel>
+  </TabPanels>
+</Tabs>
+
+### Birthday & Address Verification
+
+<Tabs defaultValue="javascript">
+  <TabList>
+    <Tab value="javascript">JavaScript</Tab>
+    <Tab value="python">Python</Tab>
+  </TabList>
+  <TabPanels>
+    <TabPanel value="javascript">
+      ```javascript
+      // Birthday verification
+      if (charge.data.charge.flow_status === 'send_birthday') {
+        await client.charge.submitBirthday({
+          reference: charge.data.reference,
+          birthday: "1990-01-01"
+        });
+      }
+
+      // Address verification
+      if (charge.data.charge.flow_status === 'send_address') {
+        await client.charge.submitAddress({
+          reference: charge.data.reference,
+          address: "123 Main St",
+          city: "Accra",
+          postal_code: "00233"
+        });
+      }
+      ```
+    </TabPanel>
+    <TabPanel value="python">
+      ```python
+      # Birthday verification
+      if charge.data.charge.flow_status == 'send_birthday':
+          client.charge.submit_birthday(
+              reference=charge.data.reference,
+              birthday="1990-01-01"
+          )
+
+      # Address verification
+      if charge.data.charge.flow_status == 'send_address':
+          client.charge.submit_address(
+              reference=charge.data.reference,
+              address="123 Main St",
+              city="Accra",
+              postal_code="00233"
+          )
+      ```
+    </TabPanel>
+  </TabPanels>
+</Tabs>
+
+## Flow Status Reference
+
+| Status | Method to Call |
+|--------|---------------|
+| `send_pin` | `submitPIN()` |
+| `send_otp` | `submitOTP()` or `resendOTP()` |
+| `send_birthday` | `submitBirthday()` |
+| `send_address` | `submitAddress()` |
+| `open_url` | Open `three_ds_url` in iframe |
+| `pay_offline` | Poll `verify()` |
+| `success` | Done |
+| `failed` | Done |
+
+<Callout type="info" title="Checkout Page Handles This">
+  If you're using the hosted checkout page, all multi-step flows are handled automatically. You only need to implement this logic if you're building a custom payment UI.
+</Callout>

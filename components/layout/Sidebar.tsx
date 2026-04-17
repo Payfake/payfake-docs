@@ -28,7 +28,7 @@ export function Sidebar() {
     >
       <Link href="/" className="flex items-center gap-3 mb-8">
         <Image
-          src="/logo.JPG"
+          src="/logo.jpeg"
           alt="Payfake"
           width={32}
           height={32}

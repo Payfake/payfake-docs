@@ -9,16 +9,95 @@ The Control API is Payfake's power layer — endpoints for manipulating the simu
 
 All control endpoints require JWT authentication.
 
-<Endpoint method="PUT" path="/api/v1/control/scenario" />
-
-### Update Scenario
-
-Configures the simulation behavior.
-
 **Headers:**
 ```
 Authorization: Bearer <jwt_token>
 ```
+
+---
+
+## Stats
+
+<Endpoint method="GET" path="/api/v1/control/stats" />
+
+### Get Stats
+
+Returns aggregated statistics for the merchant's account.
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Stats fetched",
+  "data": {
+    "transactions": {
+      "total": 142,
+      "successful": 118,
+      "failed": 14,
+      "pending": 6,
+      "abandoned": 4,
+      "success_rate": 83.09
+    },
+    "volume": {
+      "total_amount": 1420000
+    },
+    "customers": {
+      "total": 38
+    },
+    "webhooks": {
+      "total": 132,
+      "delivered": 128,
+      "failed": 4
+    },
+    "daily_activity": [
+      { "date": "2026-04-11", "count": 12, "volume": 120000 },
+      { "date": "2026-04-12", "count": 18, "volume": 180000 },
+      { "date": "2026-04-13", "count": 24, "volume": 240000 },
+      { "date": "2026-04-14", "count": 31, "volume": 310000 },
+      { "date": "2026-04-15", "count": 28, "volume": 280000 },
+      { "date": "2026-04-16", "count": 15, "volume": 150000 },
+      { "date": "2026-04-17", "count": 14, "volume": 140000 }
+    ]
+  },
+  "code": "STATS_FETCHED"
+}
+```
+
+---
+
+## Scenario Control
+
+<Endpoint method="GET" path="/api/v1/control/scenario" />
+
+### Get Scenario
+
+Returns the current scenario configuration.
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Scenario config fetched",
+  "data": {
+    "id": "SCN_xxxxxxxxxxxx",
+    "merchant_id": "MRC_xxxxxxxxxxxx",
+    "failure_rate": 0.0,
+    "delay_ms": 0,
+    "force_status": "",
+    "error_code": "",
+    "is_active": true
+  },
+  "code": "SCENARIO_FETCHED"
+}
+```
+
+<Endpoint method="PUT" path="/api/v1/control/scenario" />
+
+### Update Scenario
+
+Configures the simulation behavior. All fields are optional — only send what you want to change.
 
 **Request Body:**
 
@@ -34,7 +113,7 @@ Authorization: Bearer <jwt_token>
 | Field | Type | Description |
 |-------|------|-------------|
 | `failure_rate` | float | Probability of failure (0.0 - 1.0) |
-| `delay_ms` | integer | Artificial delay in milliseconds |
+| `delay_ms` | integer | Artificial delay in milliseconds (max 30000) |
 | `force_status` | string | Override all charges to this status |
 | `error_code` | string | Error code when status is `failed` |
 
@@ -44,11 +123,47 @@ Authorization: Bearer <jwt_token>
 
 Resets all simulation settings to defaults (0% failure, 0ms delay).
 
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Scenario config reset to defaults",
+  "data": {
+    "failure_rate": 0.0,
+    "delay_ms": 0,
+    "force_status": "",
+    "error_code": ""
+  },
+  "code": "SCENARIO_RESET"
+}
+```
+
+---
+
+## Transaction Control
+
+<Endpoint method="GET" path="/api/v1/control/transactions" />
+
+### List All Transactions
+
+Returns all transactions for the merchant with pagination.
+
+**Query Parameters:**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `page` | 1 | Page number |
+| `per_page` | 50 | Results per page (max 100) |
+| `status` | - | Filter by status |
+
 <Endpoint method="POST" path="/api/v1/control/transactions/:reference/force" />
 
 ### Force Transaction Outcome
 
 Forces a pending transaction to a specific terminal state.
+
+**Request Body:**
 
 ```json
 {
@@ -57,6 +172,90 @@ Forces a pending transaction to a specific terminal state.
 }
 ```
 
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Transaction outcome forced",
+  "data": {
+    "id": "TXN_xxxxxxxxxxxx",
+    "reference": "your-ref-001",
+    "status": "failed"
+  },
+  "code": "TRANSACTION_FORCED"
+}
+```
+
 <Callout type="success" title="Deterministic Testing">
   Use the force endpoint for deterministic test scenarios. It bypasses the scenario engine entirely — the outcome is always exactly what you specify.
 </Callout>
+
+---
+
+## Customer Control
+
+<Endpoint method="GET" path="/api/v1/control/customers" />
+
+### List All Customers
+
+Returns all customers for the merchant with pagination.
+
+**Query Parameters:**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `page` | 1 | Page number |
+| `per_page` | 50 | Results per page (max 100) |
+
+---
+
+## Webhook Control
+
+<Endpoint method="GET" path="/api/v1/control/webhooks" />
+
+### List Webhooks
+
+Returns webhook delivery history.
+
+**Query Parameters:**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `page` | 1 | Page number |
+| `per_page` | 50 | Results per page (max 100) |
+
+<Endpoint method="GET" path="/api/v1/control/webhooks/:id/attempts" />
+
+### Get Webhook Attempts
+
+Returns delivery attempts for a specific webhook.
+
+<Endpoint method="POST" path="/api/v1/control/webhooks/:id/retry" />
+
+### Retry Webhook
+
+Manually retries a failed webhook delivery.
+
+---
+
+## Logs Control
+
+<Endpoint method="GET" path="/api/v1/control/logs" />
+
+### Get Logs
+
+Returns API request/response logs.
+
+**Query Parameters:**
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `page` | 1 | Page number |
+| `per_page` | 50 | Results per page (max 100) |
+
+<Endpoint method="DELETE" path="/api/v1/control/logs" />
+
+### Clear Logs
+
+Permanently deletes all logs for the merchant.

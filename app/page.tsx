@@ -27,7 +27,7 @@ export default function DocsHomepage() {
         >
           <div className="flex items-center gap-3 mb-8">
             <Image
-              src="/logo.JPG"
+              src="/logo.jpeg"
               alt="Payfake"
               width={48}
               height={48}

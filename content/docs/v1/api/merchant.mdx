@@ -1,0 +1,197 @@
+---
+title: Merchant API
+description: Manage merchant profile and webhook settings
+---
+
+# Merchant API
+
+The Merchant API handles merchant profile management and webhook configuration.
+
+All endpoints require JWT authentication.
+
+## Authentication
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+Or cookie-based authentication with `payfake_access`.
+
+---
+
+<Endpoint method="GET" path="/api/v1/merchant" />
+
+### Get Profile
+
+Returns the authenticated merchant's profile.
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Profile fetched",
+  "data": {
+    "id": "MRC_xxxxxxxxxxxx",
+    "business_name": "Acme Store",
+    "email": "dev@acme.com",
+    "public_key": "pk_test_xxx",
+    "webhook_url": "https://yourapp.com/webhook",
+    "is_active": true,
+    "created_at": "2026-04-12T00:00:00Z",
+    "updated_at": "2026-04-12T00:00:00Z"
+  },
+  "code": "MERCHANT_FETCHED"
+}
+```
+
+---
+
+<Endpoint method="PUT" path="/api/v1/merchant" />
+
+### Update Profile
+
+Updates the merchant's profile. All fields are optional.
+
+**Request Body:**
+
+```json
+{
+  "business_name": "Acme Store Updated",
+  "webhook_url": "https://yourapp.com/webhook"
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Profile updated",
+  "data": {
+    "id": "MRC_xxxxxxxxxxxx",
+    "business_name": "Acme Store Updated",
+    "email": "dev@acme.com",
+    "webhook_url": "https://yourapp.com/webhook",
+    "updated_at": "2026-04-12T00:00:00Z"
+  },
+  "code": "MERCHANT_UPDATED"
+}
+```
+
+---
+
+<Endpoint method="PUT" path="/api/v1/merchant/password" />
+
+### Change Password
+
+Updates the merchant's password.
+
+**Request Body:**
+
+```json
+{
+  "current_password": "secret123",
+  "new_password": "newsecret456"
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Password changed successfully",
+  "data": null,
+  "code": "MERCHANT_PASSWORD_UPDATED"
+}
+```
+
+**Error (Incorrect Current Password):**
+
+```json
+{
+  "status": "error",
+  "message": "Current password is incorrect",
+  "errors": [
+    { "field": "current_password", "message": "Incorrect password" }
+  ],
+  "code": "AUTH_INVALID_CREDENTIALS"
+}
+```
+
+---
+
+## Webhook Management
+
+<Endpoint method="GET" path="/api/v1/merchant/webhook" />
+
+### Get Webhook URL
+
+Returns the current webhook URL configuration.
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Webhook URL fetched",
+  "data": {
+    "webhook_url": "https://yourapp.com/webhook"
+  },
+  "code": "WEBHOOK_FETCHED"
+}
+```
+
+---
+
+<Endpoint method="POST" path="/api/v1/merchant/webhook" />
+
+### Update Webhook URL
+
+Sets or updates the webhook URL for receiving payment notifications.
+
+**Request Body:**
+
+```json
+{
+  "webhook_url": "https://yourapp.com/webhook"
+}
+```
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Webhook URL updated",
+  "data": {
+    "webhook_url": "https://yourapp.com/webhook"
+  },
+  "code": "WEBHOOK_UPDATED"
+}
+```
+
+---
+
+<Endpoint method="POST" path="/api/v1/merchant/webhook/test" />
+
+### Test Webhook
+
+Sends a test webhook event to the configured webhook URL.
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Test webhook sent",
+  "data": null,
+  "code": "WEBHOOK_TEST_SENT"
+}
+```
+
+<Callout type="info" title="Webhook Events">
+  Webhooks are sent as `POST` requests with HMAC-SHA512 signatures. See the [Webhooks Guide](/docs/guides/webhooks) for details on verifying signatures and handling events.
+</Callout>

@@ -5,7 +5,7 @@ description: Simulate different payment outcomes for testing
 
 # Testing Scenarios
 
-Payfake's scenario engine lets you simulate any payment outcome deterministically.
+Payfake's scenario engine lets you simulate any payment outcome deterministically, including multi-step flows like PIN verification, OTP, and 3D Secure.
 
 ## Global Scenario Configuration
 
@@ -28,6 +28,98 @@ Force a specific transaction to a terminal state:
 curl -X POST http://localhost:8080/api/v1/control/transactions/REF_xxx/force \
   -H "Authorization: Bearer <jwt_token>" \
   -d '{"status": "failed", "error_code": "CHARGE_INSUFFICIENT_FUNDS"}'
+```
+
+## Multi-Step Flow Testing
+
+### Testing PIN Verification Flow
+
+```bash
+# 1. Initialize and charge card
+curl -X POST http://localhost:8080/api/v1/charge/card \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"access_code": "ACC_xxx", "card_number": "4111111111111111", "card_expiry": "12/26", "cvv": "123"}'
+
+# Response returns flow_status: "send_pin"
+
+# 2. Submit PIN
+curl -X POST http://localhost:8080/api/v1/charge/submit_pin \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"reference": "TXN_xxx", "pin": "1234"}'
+```
+
+### Testing OTP Verification Flow
+
+```bash
+# 1. Initialize and charge mobile money
+curl -X POST http://localhost:8080/api/v1/charge/mobile_money \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"access_code": "ACC_xxx", "phone": "+233241234567", "provider": "mtn"}'
+
+# Response returns flow_status: "send_otp"
+
+# 2. Submit OTP
+curl -X POST http://localhost:8080/api/v1/charge/submit_otp \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"reference": "TXN_xxx", "otp": "123456"}'
+
+# 3. Resend OTP (if needed)
+curl -X POST http://localhost:8080/api/v1/charge/resend_otp \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"reference": "TXN_xxx"}'
+```
+
+### Testing 3D Secure Flow
+
+```bash
+# 1. Charge returns flow_status: "open_url" with three_ds_url
+curl -X POST http://localhost:8080/api/v1/charge/card \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"access_code": "ACC_xxx", "card_number": "4111111111111111", "card_expiry": "12/26", "cvv": "123"}'
+
+# 2. Simulate 3DS completion (normally done by checkout page)
+curl -X POST http://localhost:8080/api/v1/public/simulate/3ds/TXN_xxx \
+  -d '{"success": true}'
+```
+
+### Testing Birthday Verification Flow
+
+```bash
+# 1. Charge returns flow_status: "send_birthday"
+curl -X POST http://localhost:8080/api/v1/charge/card \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"access_code": "ACC_xxx", "card_number": "4111111111111111", "card_expiry": "12/26", "cvv": "123"}'
+
+# 2. Submit birthday
+curl -X POST http://localhost:8080/api/v1/charge/submit_birthday \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"reference": "TXN_xxx", "birthday": "1990-01-01"}'
+```
+
+### Testing Address Verification Flow
+
+```bash
+# 1. Charge returns flow_status: "send_address"
+curl -X POST http://localhost:8080/api/v1/charge/card \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"access_code": "ACC_xxx", "card_number": "4111111111111111", "card_expiry": "12/26", "cvv": "123"}'
+
+# 2. Submit address
+curl -X POST http://localhost:8080/api/v1/charge/submit_address \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"reference": "TXN_xxx", "address": "123 Main St", "city": "Accra", "postal_code": "00233"}'
+```
+
+### Testing MoMo Pay Offline Flow
+
+```bash
+# 1. Charge returns flow_status: "pay_offline"
+curl -X POST http://localhost:8080/api/v1/charge/mobile_money \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -d '{"access_code": "ACC_xxx", "phone": "+233241234567", "provider": "mtn"}'
+
+# 2. Poll for status (checkout page does this automatically)
+curl -X GET http://localhost:8080/api/v1/public/transaction/verify/TXN_xxx
 ```
 
 ## Common Test Scenarios
@@ -91,3 +183,16 @@ Always reset the scenario after testing:
 curl -X POST http://localhost:8080/api/v1/control/scenario/reset \
   -H "Authorization: Bearer <jwt_token>"
 ```
+
+<Callout type="info" title="Flow Status Reference">
+  | Status | Description |
+  |--------|-------------|
+  | `send_pin` | PIN required |
+  | `send_otp` | OTP verification |
+  | `send_birthday` | Birthday validation |
+  | `send_address` | Address required |
+  | `open_url` | 3DS verification |
+  | `pay_offline` | MoMo prompt sent |
+  | `success` | Complete |
+  | `failed` | Failed |
+</Callout>

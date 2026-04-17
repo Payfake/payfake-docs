@@ -5,13 +5,19 @@ description: Authentication endpoints for Payfake
 
 # Auth API
 
-The Auth API handles merchant registration, login, and API key management.
+The Auth API handles merchant registration, login, token management, and API key operations.
+
+Payfake uses two types of tokens:
+- **Access Token** - Short-lived (15 minutes), used for API authentication
+- **Refresh Token** - Long-lived (7 days), stored in HTTP-only cookie, used to get new access tokens
+
+## Registration & Login
 
 <Endpoint method="POST" path="/api/v1/auth/register" />
 
 ### Register
 
-Creates a new merchant account and returns API keys.
+Creates a new merchant account and sets authentication cookies.
 
 **Request Body:**
 
@@ -28,25 +34,30 @@ Creates a new merchant account and returns API keys.
 ```json
 {
   "status": "success",
-  "message": "Merchant registered",
+  "message": "Account created successfully",
   "data": {
     "merchant": {
-      "id": "MER_xxx",
+      "id": "MRC_xxxxxxxxxxxx",
       "business_name": "Acme Store",
       "email": "dev@acme.com",
-      "public_key": "pk_test_xxx",
-      "secret_key": "sk_test_xxx"
+      "public_key": "pk_test_xxx"
     },
-    "token": "eyJhbGciOiJIUzI1NiIs..."
-  }
+    "access_token": "eyJ...",
+    "access_expiry": "2026-04-17T00:15:00Z"
+  },
+  "code": "AUTH_REGISTER_SUCCESS"
 }
 ```
+
+**Cookies Set:**
+- `payfake_access` - Access token (15 minutes)
+- `payfake_refresh` - Refresh token (7 days)
 
 <Endpoint method="POST" path="/api/v1/auth/login" />
 
 ### Login
 
-Authenticates a merchant and returns a JWT token.
+Authenticates a merchant and sets authentication cookies.
 
 **Request Body:**
 
@@ -57,26 +68,143 @@ Authenticates a merchant and returns a JWT token.
 }
 ```
 
-<Endpoint method="GET" path="/api/v1/auth/keys" />
+**Response:**
 
-### Get Keys
-
-Returns the merchant's API keys.
-
-**Headers:**
+```json
+{
+  "status": "success",
+  "message": "Login successful",
+  "data": {
+    "merchant": {
+      "id": "MRC_xxxxxxxxxxxx",
+      "business_name": "Acme Store",
+      "email": "dev@acme.com",
+      "public_key": "pk_test_xxx"
+    },
+    "access_token": "eyJ...",
+    "access_expiry": "2026-04-17T00:15:00Z"
+  },
+  "code": "AUTH_LOGIN_SUCCESS"
+}
 ```
-Authorization: Bearer <jwt_token>
+
+**Error (Invalid Credentials):**
+
+```json
+{
+  "status": "error",
+  "message": "Invalid email or password",
+  "errors": [],
+  "code": "AUTH_INVALID_CREDENTIALS"
+}
 ```
+
+---
+
+## Token Management
+
+<Endpoint method="POST" path="/api/v1/auth/refresh" />
+
+### Refresh Token
+
+Gets a new access token using the refresh token cookie. Called automatically by the SDK when the access token expires.
+
+**Auth:** `payfake_refresh` cookie (sent automatically)
 
 **Response:**
 
 ```json
 {
   "status": "success",
+  "message": "Token refreshed",
+  "data": {
+    "access_token": "eyJ...",
+    "access_expiry": "2026-04-17T00:30:00Z"
+  },
+  "code": "AUTH_REFRESH_SUCCESS"
+}
+```
+
+**Error (Expired Refresh Token):**
+
+```json
+{
+  "status": "error",
+  "message": "Session expired, please login again",
+  "errors": [],
+  "code": "AUTH_TOKEN_EXPIRED"
+}
+```
+
+<Endpoint method="POST" path="/api/v1/auth/logout" />
+
+### Logout
+
+Invalidates the current session and clears authentication cookies.
+
+**Auth:** `payfake_access` cookie or `Authorization: Bearer <access_token>`
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Logged out successfully",
+  "data": null,
+  "code": "AUTH_LOGOUT_SUCCESS"
+}
+```
+
+---
+
+## Profile & Keys
+
+<Endpoint method="GET" path="/api/v1/auth/me" />
+
+### Get Current User
+
+Returns the authenticated merchant's profile.
+
+**Auth:** `payfake_access` cookie or `Authorization: Bearer <access_token>`
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Profile fetched",
+  "data": {
+    "id": "MRC_xxxxxxxxxxxx",
+    "business_name": "Acme Store",
+    "email": "dev@acme.com",
+    "public_key": "pk_test_xxx",
+    "webhook_url": "https://yourapp.com/webhook",
+    "is_active": true,
+    "created_at": "2026-04-12T00:00:00Z"
+  },
+  "code": "AUTH_PROFILE_FETCHED"
+}
+```
+
+<Endpoint method="GET" path="/api/v1/auth/keys" />
+
+### Get Keys
+
+Returns the merchant's API keys.
+
+**Auth:** `payfake_access` cookie or `Authorization: Bearer <access_token>`
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Keys fetched successfully",
   "data": {
     "public_key": "pk_test_xxx",
     "secret_key": "sk_test_xxx"
-  }
+  },
+  "code": "AUTH_KEYS_FETCHED"
 }
 ```
 
@@ -86,6 +214,26 @@ Authorization: Bearer <jwt_token>
 
 Generates new API keys. The old secret key is immediately invalidated.
 
+**Auth:** `payfake_access` cookie or `Authorization: Bearer <access_token>`
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Keys regenerated successfully",
+  "data": {
+    "public_key": "pk_test_xxx_new",
+    "secret_key": "sk_test_xxx_new"
+  },
+  "code": "AUTH_KEY_REGENERATED"
+}
+```
+
 <Callout type="warning" title="Breaking Change">
   Regenerating keys invalidates the old secret key immediately. Update your application's secret key to avoid service interruption.
+</Callout>
+
+<Callout type="info" title="Cookie-Based Auth">
+  The dashboard uses HTTP-only cookies for authentication. The access token is also returned in the response body for mobile/CLI applications that can't use cookies.
 </Callout>

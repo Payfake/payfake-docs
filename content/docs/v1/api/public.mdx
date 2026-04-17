@@ -52,11 +52,32 @@ Returns transaction details for the checkout page.
 }
 ```
 
+<Endpoint method="GET" path="/api/v1/public/transaction/verify/:reference" />
+
+### Verify Transaction
+
+Poll this endpoint to check the status of a transaction. Used for `pay_offline` MoMo flows where the customer approves the payment on their phone.
+
+**Response:**
+
+```json
+{
+  "status": "success",
+  "message": "Transaction verified",
+  "data": {
+    "reference": "TXN_xxx",
+    "status": "success",
+    "amount": 10000,
+    "currency": "GHS"
+  }
+}
+```
+
 <Endpoint method="POST" path="/api/v1/public/charge/card" />
 
 ### Charge Card
 
-Processes a card payment from the checkout page.
+Processes a card payment from the checkout page. May return intermediate flow states requiring PIN, OTP, birthday, address, or 3DS.
 
 **Request Body:**
 
@@ -74,7 +95,7 @@ Processes a card payment from the checkout page.
 
 ### Charge Mobile Money
 
-Processes a mobile money payment from the checkout page.
+Processes a mobile money payment from the checkout page. May return OTP requirement or `pay_offline` status.
 
 **Request Body:**
 
@@ -103,3 +124,109 @@ Processes a bank transfer payment from the checkout page.
   "email": "customer@example.com"
 }
 ```
+
+---
+
+## Multi-Step Flow Endpoints
+
+<Endpoint method="POST" path="/api/v1/public/charge/submit_pin" />
+
+### Submit PIN
+
+Submit PIN for card verification.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx",
+  "pin": "1234"
+}
+```
+
+<Endpoint method="POST" path="/api/v1/public/charge/submit_otp" />
+
+### Submit OTP
+
+Submit OTP sent to customer's phone.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx",
+  "otp": "123456"
+}
+```
+
+<Endpoint method="POST" path="/api/v1/public/charge/resend_otp" />
+
+### Resend OTP
+
+Request a new OTP.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx"
+}
+```
+
+<Endpoint method="POST" path="/api/v1/public/charge/submit_birthday" />
+
+### Submit Birthday
+
+Submit birthday for age verification.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx",
+  "birthday": "1990-01-01"
+}
+```
+
+<Endpoint method="POST" path="/api/v1/public/charge/submit_address" />
+
+### Submit Address
+
+Submit address information.
+
+**Request Body:**
+
+```json
+{
+  "reference": "TXN_xxx",
+  "address": "123 Independence Ave",
+  "city": "Accra",
+  "postal_code": "00233"
+}
+```
+
+---
+
+## 3D Secure Simulation
+
+<Endpoint method="POST" path="/api/v1/public/simulate/3ds/:reference" />
+
+### Simulate 3DS
+
+Called after the 3DS simulation page completes. The checkout page opens `/simulate/3ds/:reference` in an iframe, user selects success/fail, and this endpoint processes the result.
+
+**Request Body:**
+
+```json
+{
+  "success": true
+}
+```
+
+**Response:**
+
+Returns the final charge outcome with updated `flow_status` (`success` or `failed`).
+
+<Callout type="info" title="3DS Flow">
+  When a charge returns `flow_status: "open_url"`, the checkout opens `three_ds_url` in an iframe. After user interaction, a postMessage is sent to the parent, which then calls this endpoint to complete the 3DS verification.
+</Callout>
